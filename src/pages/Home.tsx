@@ -8,6 +8,7 @@ import { CartItem } from '../context/CartContext';
 import { Product } from '../types';
 import { useToast } from '../components/ToastProvider';
 import { waitlistAPI } from '../services/api';
+import Modal from '../components/Modal';
 
 
 
@@ -73,12 +74,37 @@ export const Home: React.FC = () => {
     { name: "Sophia L.", role: "Influencer", quote: "Authenticity is my biggest concern, and Stylus delivers. Every bag I've rented has been pristine and verified." }
   ];
 
-  const team = [
-    { name: "Augustine Achi", role: "Founder & CEO", img: "/Austin.jpeg" },
-    { name: "Augustine Nwodo", role: "Chief Marketing Manager", img: "/Austin_Nwodo.jpeg" },
-    { name: "Francis Okonkwo", role: "Chief Project Manager", img: "/Francis1.jpeg" },
-    { name: "Augustine Odezulu", role: "Chief Developing Manager", img: "/Austin_Odezulu.jpeg" },
-  ];
+   interface TeamMember { name: string; role: string; img: string; bio?: string }
+
+   const team: TeamMember[] = [
+      {
+         name: "Augustine Achi",
+         role: "Founder & CEO",
+         img: "/Austin.jpeg",
+         bio: "Augustine is the visionary behind Stylus with over a decade of experience in luxury retail and brand partnerships. He focuses on curating rare archival pieces and building relationships with top houses to make luxury accessible. Augustine leads strategy, operations, and the creative direction of the company."
+      },
+      {
+         name: "Nguveren Monica Dzuamo",
+         role: "Legal Advisor",
+         img: "/monica_pic.jpeg",
+         bio: "Nguveren Monica Dzuamo, Esq. is a dynamic legal practitioner and certified Privacy Professional specializing in corporate law, data governance, and regulatory compliance. She bridges the gap between law and technology, helping organizations secure their digital operations while navigating Nigeria’s complex regulatory landscapes. She provides legal counsel on data protection and privacy, authenticity, contracts, and IP matters. With a background in fashion law, she ensures our contracts, partner agreements, and verification processes meet the highest regulatory standards. She also leads our compliance and risk assessments."
+      },
+      {
+         name: "Francis Okonkwo",
+         role: "Chief Project Manager",
+         img: "/Francis1.jpeg",
+         bio: "Francis coordinates lending logistics, inventory operations, and client experiences. He brings deep expertise in supply chain management and customer fulfillment to guarantee timely deliveries and pristine returns. Francis ensures every rental meets our quality benchmarks."
+      },
+      {
+         name: "Augustine Odezulu",
+         role: "Chief Developing Manager",
+         img: "/Austin_Odezulu.jpeg",
+         bio: "Augustine Odezulu is a technology and engineering professional leading Stylus’s engineering and product development. As Chief Developing Manager, he oversees the design and development of Stylus’s digital infrastructure, products, and user experiences, with a focus on building scalable, reliable, and intuitive solutions. He drives technical strategy, system architecture, feature development, and product innovation, ensuring that technology effectively supports Stylus’s vision and growth. He is passionate about creating seamless digital experiences and building robust technology that connects fashion, creativity, and commerce."
+      },
+   ];
+
+   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
+   const [showFullBio, setShowFullBio] = useState(false);
 
   const quickAddToCart = (product: Product) => {
     // Basic add to cart for demo from home page
@@ -424,16 +450,56 @@ export const Home: React.FC = () => {
                         {/* Description */}
                         <p className="text-cream/60 text-sm mb-6 flex-grow">Bringing expertise and passion to every aspect of Stylus.</p>
                         
-                        {/* Button */}
-                        <button className="w-full py-2 px-4 border border-golden-orange/30 text-golden-orange text-xs uppercase tracking-widest hover:bg-golden-orange/10 hover:border-golden-orange/60 transition-all duration-300">
-                           View Profile
-                        </button>
+                                    {/* Button */}
+                                    <button
+                                       onClick={() => { setSelectedMember(member); setShowFullBio(false); }}
+                                       className="w-full py-2 px-4 border border-golden-orange/30 text-golden-orange text-xs uppercase tracking-widest hover:bg-golden-orange/10 hover:border-golden-orange/60 transition-all duration-300"
+                                    >
+                                        View Profile
+                                    </button>
                      </div>
                   </div>
                ))}
             </div>
          </div>
       </section>
+
+         {/* Team Profile Modal */}
+         <Modal
+            open={!!selectedMember}
+            title={selectedMember?.name}
+            onClose={() => setSelectedMember(null)}
+            footer={
+               selectedMember && (
+                  <div className="w-full flex items-center justify-between">
+                       <div className="text-sm text-cream/70">{selectedMember.role}</div>
+                       <Button variant="secondary" onClick={() => setSelectedMember(null)} className="px-3 py-2 text-xs">
+                         Close
+                       </Button>
+                  </div>
+               )
+            }
+         >
+            {selectedMember && (
+               <div className="flex gap-6 items-start">
+                  <div className="w-40 h-40 rounded-full overflow-hidden flex-shrink-0 border border-golden-orange/20">
+                     <img src={selectedMember.img} alt={selectedMember.name} className="w-full h-full object-cover" />
+                  </div>
+                  <div>
+                     <p className="text-golden-orange text-xs uppercase tracking-widest mb-2 font-semibold">{selectedMember.role}</p>
+                     <p className="text-cream/80 text-sm mb-4">{showFullBio ? selectedMember.bio : (selectedMember.bio?.slice(0, 140) ?? '')}{selectedMember.bio && selectedMember.bio.length > 140 && !showFullBio ? '...' : ''}</p>
+                     {selectedMember.bio && selectedMember.bio.length > 140 && (
+                        <button
+                           onClick={() => setShowFullBio((s) => !s)}
+                           className="text-golden-orange text-sm font-semibold hover:underline"
+                        >
+                           {showFullBio ? 'Show less' : 'Show more'}
+                        </button>
+                     )}
+                  </div>
+               </div>
+            )}
+         </Modal>
 
       {/* 7. NEWSLETTER SECTION */}
       <section className="py-24 bg-gradient-to-r from-espresso to-[#1f0c05] relative overflow-hidden border-t border-golden-orange/20">
