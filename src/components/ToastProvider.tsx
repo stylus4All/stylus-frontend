@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
-type Toast = { id: string; message: string; type?: 'success' | 'error' | 'info' };
+type Toast = { id: string; message: string; type?: 'success' | 'error' | 'warning' | 'info' };
 
 type ToastContextType = {
   toast: (msg: string, type?: Toast['type']) => void;

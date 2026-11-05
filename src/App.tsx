@@ -73,7 +73,22 @@ function App() {
                     <Route path="/authenticity" element={<InfoPage type="authenticity" />} />
                     <Route path="/bag" element={<InfoPage type="bag" />} />
                     
-                    <Route path="/admin" element={<AdminDashboard />} />
+                    <Route
+                      path="/admin"
+                      element={
+                        <ProtectedRoute requireAdmin={true}>
+                          <AdminDashboard />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/admin/dashboard"
+                      element={
+                        <ProtectedRoute requireAdmin={true}>
+                          <AdminDashboard />
+                        </ProtectedRoute>
+                      }
+                    />
                   </Routes>
                 </Layout>
               </Router>

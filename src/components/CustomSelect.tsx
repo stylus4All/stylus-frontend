@@ -37,7 +37,7 @@ const CustomSelect: React.FC<Props> = ({ options, value, onChange, className = '
         onClick={toggleOpen}
         className="w-full flex items-center justify-between px-3 py-2.5 bg-[#1f0c05] border border-golden-orange/30 text-cream rounded-sm text-sm focus:outline-none focus:ring-0"
       >
-        <span className="truncate">{value || placeholder}</span>
+        <span className="truncate">{value ?? placeholder}</span>
         <svg className="ml-2 w-3 h-3 text-golden-orange" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M5 7l5 5 5-5" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
         </svg>

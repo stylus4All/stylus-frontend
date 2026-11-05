@@ -22,34 +22,75 @@ export interface Review {
   date: string;
 }
 
-export interface Product {
+export interface ProductReview {
   id: string;
-  name: string;
-  brand: string;
-  category: Category;
-  rentalPrice: number;
-  retailPrice: number;
-  buyPrice?: number;
-  isForSale?: boolean;
-  ownerId?: string;
-  images: string[];
-  description: string;
-  availableSizes: string[];
-  color: string;
-  occasion: string;
-  condition?: string;
-  reviews: Review[];
-  rentalCount?: number;
-  autoSellAfterRentals?: number;
-  rentalDuration?: number;
-  approval?: {
-    images?: 'Pending' | 'Approved' | 'Rejected';
-    price?: 'Pending' | 'Approved' | 'Rejected';
-    description?: 'Pending' | 'Approved' | 'Rejected';
-    status?: 'Pending' | 'Approved' | 'Rejected';
-    notes?: string;
+  rating?: number;
+  comment?: string | null;
+  user?: {
+    id: number;
+    name: string;
   };
 }
+
+export interface Product {
+  id: string;
+  ownerId: number;
+  name: string;
+  brand: string;
+  category: string;
+  rentalPrice: number;
+  retailPrice: number;
+  buyPrice: number;
+  description?: string | null;
+  color?: string | null;
+  occasion?: string | null;
+  availableSizes: string[];
+  images: string[];
+  isForSale: boolean;
+  autoSellAfterRentals: number;
+  rentalCount: number;
+  status: "Pending" | "Approved" | "Rejected";
+  rejectionReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+
+  owner?: {
+    id: number;
+    name: string;
+    email: string;
+  };
+
+  reviews?: ProductReview[];
+}
+
+// export interface Product {
+//   id: string;
+//   name: string;
+//   brand: string;
+//   category: Category;
+//   rentalPrice: number;
+//   retailPrice: number;
+//   buyPrice?: number;
+//   isForSale?: boolean;
+//   ownerId?: string;
+//   images: string[];
+//   description: string;
+//   availableSizes: string[];
+//   color: string;
+//   occasion: string;
+//   condition?: string;
+//   reviews: Review[];
+//   rentalCount?: number;
+//   autoSellAfterRentals?: number;
+//   rentalDuration?: number;
+//   approval?: {
+//     images?: 'Pending' | 'Approved' | 'Rejected';
+//     price?: 'Pending' | 'Approved' | 'Rejected';
+//     description?: 'Pending' | 'Approved' | 'Rejected';
+//     status?: 'Pending' | 'Approved' | 'Rejected';
+//     notes?: string;
+//   };
+// }
 
 export interface ProductFilter {
   category: Category | 'All';

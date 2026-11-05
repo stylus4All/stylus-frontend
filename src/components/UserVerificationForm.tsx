@@ -12,17 +12,18 @@ export const UserVerificationForm: React.FC<UserVerificationFormProps> = ({ onSu
     const [bvn, setBvn] = useState('');
     const [idType, setIdType] = useState('NIN');
     const [idFile, setIdFile] = useState<File | null>(null);
-    
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) setIdFile(e.target.files[0]);
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const govIdUrl = idFile ? URL.createObjectURL(idFile) : 'https://images.unsplash.com/photo-1633265486064-084b2195299b?q=80&w=1000&auto=format&fit=crop';
+        if (!idFile) return;
+        const govIdUrl = URL.createObjectURL(idFile);
         onSubmit({ bvn, idType, govIdUrl });
     };
-    
+
     return (
         <div className="bg-[#1f0c05] p-8 border border-golden-orange shadow-2xl rounded-sm">
             <h3 className="font-serif text-2xl text-cream mb-4">Identity Verification</h3>
@@ -33,12 +34,12 @@ export const UserVerificationForm: React.FC<UserVerificationFormProps> = ({ onSu
                         <label className="text-xs uppercase text-cream/50 mb-1 block">BVN (11 Digits)</label>
                         <input required placeholder="Enter BVN" value={bvn} onChange={e => setBvn(e.target.value)} className="w-full bg-black/20 border border-white/10 text-cream p-3 focus:border-golden-orange outline-none" />
                     </div>
-                    
+
                     <div>
                         <label className="text-xs uppercase text-cream/50 mb-1 block">Identification Type</label>
                         <div className="relative mb-2">
                             <CustomSelect
-                                options={[ 'National Identity Number (NIN)', "Driver's License", 'International Passport', "Voter's Card" ]}
+                                options={['National Identity Number (NIN)', "Driver's License", 'International Passport', "Voter's Card"]}
                                 value={idType}
                                 onChange={(v) => setIdType(v)}
                                 placeholder="Select ID type"
@@ -50,7 +51,7 @@ export const UserVerificationForm: React.FC<UserVerificationFormProps> = ({ onSu
                         <input type="file" required onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*" />
                         <Upload className="mx-auto text-cream/40 mb-2" />
                         <span className="text-xs uppercase text-cream/60 flex items-center justify-center gap-2">
-                             {idFile ? <><Check size={14} className="text-green-400"/> {idFile.name}</> : `Upload ${idType} Document`}
+                            {idFile ? <><Check size={14} className="text-green-400" /> {idFile.name}</> : `Upload ${idType} Document`}
                         </span>
                     </div>
                 </div>

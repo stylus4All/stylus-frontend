@@ -30,7 +30,11 @@ const AdminUsers: React.FC<{ users?: any[] }> = ({ users = [] }) => {
         approveVerification && approveVerification(user.id);
         toast(`${user.name} approved.`, 'success');
         try {
-          await userAPI.approveVerification(parseInt(user.id));
+          if (user.role === 'Partner') {
+            await adminAPI.verifyPartner(parseInt(user.id), { verificationStatus: 'Verified' });
+          } else {
+            await userAPI.approveVerification(parseInt(user.id));
+          }
           setSelected(null);
         } catch (err: any) {
           console.error(err);
@@ -103,7 +107,7 @@ const AdminUsers: React.FC<{ users?: any[] }> = ({ users = [] }) => {
   // modal states
   const [roleModalOpen, setRoleModalOpen] = useState(false);
   const [roleTarget, setRoleTarget] = useState<any | null>(null);
-  const [roleCandidate, setRoleCandidate] = useState<string>('User');
+  const [roleCandidate, setRoleCandidate] = useState<'User' | 'Partner' | 'Admin'>('User');
 
   const [walletModalOpen, setWalletModalOpen] = useState(false);
   const [walletTarget, setWalletTarget] = useState<any | null>(null);
@@ -230,9 +234,9 @@ const AdminUsers: React.FC<{ users?: any[] }> = ({ users = [] }) => {
         <div className="space-y-2">
           <label className="text-cream/70 text-xs">Select role</label>
           <CustomSelect
-            options={[ 'User', 'Partner', 'Admin' ]}
+            options={['User', 'Partner', 'Admin']}
             value={roleCandidate}
-            onChange={(v) => setRoleCandidate(v)}
+            onChange={(v) => setRoleCandidate(v as 'User' | 'Partner' | 'Admin')}
           />
         </div>
       </Modal>
@@ -275,7 +279,14 @@ const AdminUsers: React.FC<{ users?: any[] }> = ({ users = [] }) => {
           <button onClick={async () => {
             if (!rejectVerification || !rejectTarget) return;
             try {
-              await userAPI.rejectVerification(parseInt(rejectTarget.id), rejectReason);
+              if (rejectTarget.role === 'Partner') {
+                await adminAPI.verifyPartner(parseInt(rejectTarget.id), {
+                  verificationStatus: 'Rejected',
+                  adminNotes: rejectReason,
+                });
+              } else {
+                await userAPI.rejectVerification(parseInt(rejectTarget.id), rejectReason);
+              }
               rejectVerification(rejectTarget.id, rejectReason);
               toast(`${rejectTarget.name} rejected.`, 'info');
               setRejectModalOpen(false);
