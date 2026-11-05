@@ -13,205 +13,134 @@ type ApiRequestConfig = AxiosRequestConfig & {
 // ============================================================
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  import.meta.env.VITE_API_URL ||
+  (import.meta.env as any).VITE_API_BASE_URL ||
+  (import.meta.env as any).VITE_API_URL ||
   "https://stylus-backend-dbsi.onrender.com";
 
 // ============================================================
-// Axios Client
+// API ERROR
 // ============================================================
 
-const apiClient = axios.create({
-  baseURL: `${API_BASE_URL.replace(/\/+$/, "").replace(/\/api$/, "")}/api`,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
+export class ApiError extends Error {
+  status: number;
+  data: any;
 
-// ============================================================
-// Request Interceptor
-// ============================================================
+  constructor(message: string, status: number, data?: any) {
+    super(message);
 
-apiClient.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem("authToken");
-
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-
-    // Allow FormData uploads.
-    // The browser must set the multipart boundary automatically.
-    if (config.data instanceof FormData) {
-      delete config.headers["Content-Type"];
-    }
-
-    return config;
-  },
-  (error) => Promise.reject(error),
-);
-
-// ============================================================
-// Response / Error Helper
-// ============================================================
-
-function getApiErrorMessage(
-  error: AxiosError<{
-    error?: string;
-    message?: string;
-  }>,
-): string {
-  const responseData = error.response?.data;
-
-  if (typeof responseData === "string") {
-    return responseData;
+    this.name = "ApiError";
+    this.status = status;
+    this.data = data;
   }
-
-  if (responseData?.error) {
-    return responseData.error;
-  }
-
-  if (responseData?.message) {
-    return responseData.message;
-  }
-
-  if (error.response?.status) {
-    return `API error: ${error.response.status}`;
-  }
-
-  return "Network error. Please check your connection and try again.";
 }
 
 // ============================================================
-// Generic API Request
+// API CALL HELPER
 // ============================================================
 
-export async function apiCall<T = unknown>(
-  endpoint: string,
-  config: ApiRequestConfig = {},
-): Promise<T> {
+export async function apiCall(endpoint: string, options: RequestInit = {}) {
+  const base = API_BASE_URL.replace(/\/+$/, "").replace(/\/api$/, "");
+
+  const path = endpoint.startsWith("/api") ? endpoint : `/api${endpoint}`;
+
+  const url = `${base}${path}`;
+
+  // ----------------------------------------------------------
+  // AUTH TOKEN
+  // ----------------------------------------------------------
+
+  const token = localStorage.getItem("authToken");
+
+  // ----------------------------------------------------------
+  // HEADERS
+  // ----------------------------------------------------------
+
+  const headers = new Headers(options.headers);
+
+  if (options.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  console.log(`[Stylus API] ${options.method || "GET"} ${url}`);
+
+  // ----------------------------------------------------------
+  // REQUEST
+  // ----------------------------------------------------------
+
+  let response: Response;
+
   try {
-    const path = endpoint.startsWith("/api")
-      ? endpoint.slice("/api".length)
-      : endpoint;
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    console.error("[Stylus API] Network error:", error);
 
-    const { body, ...axiosConfig } = config;
+    throw new ApiError(
+      "Unable to connect to the Stylus server. Please check your internet connection and try again.",
+      0,
+      error,
+    );
+  }
 
-    const response = await apiClient.request<T>({
-      ...axiosConfig,
-      url: path,
-      ...(body !== undefined ? { data: body } : {}),
+  // ----------------------------------------------------------
+  // RESPONSE
+  // ----------------------------------------------------------
+
+  const responseText = await response.text();
+
+  let data: any = null;
+
+  if (responseText) {
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      data = responseText;
+    }
+  }
+
+  // ----------------------------------------------------------
+  // ERROR RESPONSE
+  // ----------------------------------------------------------
+
+  if (!response.ok) {
+    let message = `API request failed (${response.status})`;
+
+    if (typeof data === "object" && data !== null) {
+      message =
+        data.error || data.message || data.details || data.msg || message;
+    } else if (typeof data === "string" && data.trim()) {
+      message = data;
+    }
+
+    console.error("[Stylus API] Error:", {
+      status: response.status,
+      url,
+      message,
+      data,
     });
 
-    return response.data;
-  } catch (error: unknown) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(
-        getApiErrorMessage(
-          error as AxiosError<{
-            error?: string;
-            message?: string;
-          }>,
-        ),
-      );
-    }
-
-    if (error instanceof Error) {
-      throw error;
-    }
-
-    throw new Error("An unexpected error occurred.");
+    throw new ApiError(message, response.status, data);
   }
+
+  return data;
 }
 
 // ============================================================
-// Authentication Types
-// ============================================================
-
-export interface AuthUserResponse {
-  id: number;
-  email: string;
-  name: string;
-
-  phone?: string | null;
-  address?: string | null;
-
-  role: "User" | "Partner" | "Admin";
-
-  tier?: string;
-
-  status: "Active" | "Suspended";
-
-  verificationStatus: "Verified" | "Unverified" | "Pending" | "Rejected";
-
-  walletBalance?: number;
-
-  location?: string | null;
-
-  joined?: string;
-  lastActive?: string;
-
-  avgSpend?: number | string;
-
-  rentalHistoryCount?: number;
-
-  searchHistory?: string[] | string;
-
-  suspensionReason?: string | null;
-
-  adminNotes?: string | null;
-
-  createdAt: string;
-  updatedAt: string;
-
-  verificationDocs?: unknown;
-}
-
-export interface AuthResponse {
-  user: AuthUserResponse;
-  token: string;
-}
-
-export interface CurrentUserResponse {
-  user: AuthUserResponse;
-}
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
-
-export interface AdminDashboardMetrics {
-  users: number;
-  partners: number;
-  products: number;
-  orders: number;
-  rentals: number;
-  transactions: number;
-}
-
-export interface AdminUserUpdate {
-  role?: "User" | "Partner" | "Admin";
-  status?: "Active" | "Suspended";
-  reason?: string;
-  adminNotes?: string;
-}
-
-export interface PartnerVerificationUpdate {
-  verificationStatus?: "Pending" | "Verified" | "Rejected";
-  adminNotes?: string;
-}
-
-// ============================================================
-// Auth APIs
+// AUTH APIs
 // ============================================================
 
 export const authAPI = {
+  // ----------------------------------------------------------
+  // REGISTER
+  // POST /api/auth/register
+  // ----------------------------------------------------------
+
   register: (data: {
     email: string;
     password: string;
@@ -221,215 +150,138 @@ export const authAPI = {
     role?: "User" | "Partner" | "Admin";
     location?: string;
   }) =>
-    apiCall<AuthResponse>("/auth/register", {
+    apiCall("/auth/register", {
       method: "POST",
-      body: data,
+      body: JSON.stringify({
+        ...data,
+        name: data.name.trim(),
+        email: data.email.trim().toLowerCase(),
+      }),
     }),
+
+  // ----------------------------------------------------------
+  // LOGIN
+  // POST /api/auth/login
+  // ----------------------------------------------------------
 
   login: (data: { email: string; password: string }) =>
-    apiCall<AuthResponse>("/auth/login", {
+    apiCall("/auth/login", {
       method: "POST",
-      body: data,
+      body: JSON.stringify({
+        email: data.email.trim().toLowerCase(),
+        password: data.password,
+      }),
     }),
 
-  getCurrentUser: () => apiCall<CurrentUserResponse>("/auth/me"),
+  // ----------------------------------------------------------
+  // CURRENT USER
+  // GET /api/auth/me
+  // ----------------------------------------------------------
+
+  getCurrentUser: () => apiCall("/auth/me"),
+
+  // ----------------------------------------------------------
+  // CHANGE PASSWORD
+  // POST /api/auth/change-password
+  // ----------------------------------------------------------
 
   changePassword: (data: { oldPassword: string; newPassword: string }) =>
-    apiCall<{ message: string }>("/auth/change-password", {
+    apiCall("/auth/change-password", {
       method: "POST",
-      body: data,
+      body: JSON.stringify(data),
     }),
 
+  // ----------------------------------------------------------
+  // LOGOUT
+  // POST /api/auth/logout
+  // ----------------------------------------------------------
+
   logout: () =>
-    apiCall<{ message: string }>("/auth/logout", {
+    apiCall("/auth/logout", {
       method: "POST",
     }),
 };
 
 // ============================================================
-// User APIs
+// USER APIs
 // ============================================================
 
 export const userAPI = {
-  getAll: () => apiCall<AuthUserResponse[]>("/users"),
+  getAll: () => apiCall("/users"),
 
-  getById: (id: number) => apiCall<AuthUserResponse>(`/users/${id}`),
+  getById: (id: number) => apiCall(`/users/${id}`),
 
-  create: (data: Record<string, unknown>) =>
-    apiCall<AuthUserResponse>("/users", {
+  create: (data: any) =>
+    apiCall("/users", {
       method: "POST",
-      body: data,
+      body: JSON.stringify(data),
     }),
 
-  update: (id: number, data: Record<string, unknown>) =>
-    apiCall<AuthUserResponse>(`/users/${id}`, {
+  update: (id: number, data: any) =>
+    apiCall(`/users/${id}`, {
       method: "PATCH",
-      body: data,
+      body: JSON.stringify(data),
     }),
 
-  updateStatus: (id: number, status: "Active" | "Suspended", reason?: string) =>
-    apiCall<AuthUserResponse>(`/users/${id}/status`, {
+  updateStatus: (id: number, status: string, reason?: string) =>
+    apiCall(`/users/${id}/status`, {
       method: "PATCH",
-      body: {
+      body: JSON.stringify({
         status,
-        ...(reason ? { reason } : {}),
-      },
+        reason,
+      }),
     }),
 
-  updateRole: (id: number, role: "User" | "Partner" | "Admin") =>
-    apiCall<AuthUserResponse>(`/users/${id}/role`, {
+  updateRole: (id: number, role: string) =>
+    apiCall(`/users/${id}/role`, {
       method: "PATCH",
-      body: { role },
+      body: JSON.stringify({
+        role,
+      }),
     }),
 
-  submitVerification: (id: number, docs: Record<string, unknown>) =>
-    apiCall<AuthUserResponse>(`/users/${id}/verify`, {
+  submitVerification: (id: number, docs: any) =>
+    apiCall(`/users/${id}/verify`, {
       method: "POST",
-      body: docs,
+      body: JSON.stringify(docs),
     }),
 
   approveVerification: (id: number) =>
-    apiCall<AuthUserResponse>(`/users/${id}/approve-verification`, {
+    apiCall(`/users/${id}/approve-verification`, {
       method: "POST",
     }),
 
   rejectVerification: (id: number, reason: string) =>
-    apiCall<AuthUserResponse>(`/users/${id}/reject-verification`, {
+    apiCall(`/users/${id}/reject-verification`, {
       method: "POST",
-      body: { reason },
+      body: JSON.stringify({
+        reason,
+      }),
     }),
 
   updateWallet: (id: number, amount: number) =>
-    apiCall<AuthUserResponse>(`/users/${id}/wallet`, {
+    apiCall(`/users/${id}/wallet`, {
       method: "PATCH",
-      body: { amount },
+      body: JSON.stringify({
+        amount,
+      }),
     }),
 
   delete: (id: number) =>
-    apiCall<{ message: string }>(`/users/${id}`, {
+    apiCall(`/users/${id}`, {
       method: "DELETE",
     }),
 };
 
 // ============================================================
-// Product APIs
+// PRODUCT APIs
 // ============================================================
 
-export interface Product {
-  id: string;
-  ownerId: number;
-  name: string;
-  brand: string;
-  category: string;
-
-  rentalPrice: number;
-  retailPrice: number;
-  buyPrice: number;
-
-  description?: string | null;
-  color?: string | null;
-  occasion?: string | null;
-
-  availableSizes: string[];
-  images: string[];
-
-  isForSale: boolean;
-
-  autoSellAfterRentals: number;
-  rentalCount: number;
-
-  status: "Pending" | "Approved" | "Rejected";
-  rejectionReason?: string | null;
-
-  createdAt: string;
-  updatedAt: string;
-
-  owner?: {
-    id: number;
-    name: string;
-    email: string;
-  };
-
-  reviews?: ProductReview[];
-}
-
-export interface ProductReview {
-  id: string;
-  rating?: number;
-  comment?: string | null;
-
-  user?: {
-    id: number;
-    name: string;
-  };
-}
-
-export interface CreateProductData {
-  ownerId: number;
-  name: string;
-  brand: string;
-  category: string;
-  rentalPrice: number;
-  retailPrice: number;
-
-  buyPrice?: number;
-  description?: string;
-  color?: string;
-  occasion?: string;
-
-  availableSizes?: string[];
-
-  isForSale?: boolean;
-  autoSellAfterRentals?: number;
-}
-
-export interface UpdateProductData {
-  name?: string;
-  brand?: string;
-  category?: string;
-
-  rentalPrice?: number;
-  retailPrice?: number;
-  buyPrice?: number;
-
-  description?: string;
-  color?: string;
-  occasion?: string;
-
-  availableSizes?: string[];
-  images?: string[];
-
-  isForSale?: boolean;
-  autoSellAfterRentals?: number;
-
-  rentalCount?: number;
-
-  status?: "Pending" | "Approved" | "Rejected";
-
-  rejectionReason?: string | null;
-}
-
-export interface ProductFilters {
-  category?: string;
-  searchQuery?: string;
-  maxPrice?: number;
-  sortBy?: string;
-}
-
-/**
- * ============================================================
- * PRODUCT API
- * ============================================================
- */
-
 export const productAPI = {
-  /**
-   * Get approved products.
-   */
-  getAll: (filters?: ProductFilters): Promise<Product[]> => {
+  getAll: (filters?: any) => {
     const params = new URLSearchParams();
 
-    if (filters?.category && filters.category !== "All") {
+    if (filters?.category) {
       params.append("category", filters.category);
     }
 
@@ -437,7 +289,7 @@ export const productAPI = {
       params.append("searchQuery", filters.searchQuery);
     }
 
-    if (filters?.maxPrice !== undefined) {
+    if (filters?.maxPrice) {
       params.append("maxPrice", String(filters.maxPrice));
     }
 
@@ -447,97 +299,38 @@ export const productAPI = {
 
     const query = params.toString();
 
-    return apiCall<Product[]>(`/products${query ? `?${query}` : ""}`);
+    return apiCall(`/products${query ? `?${query}` : ""}`);
   },
 
-  /**
-   * Get one product.
-   */
-  getById: (id: string): Promise<Product> =>
-    apiCall<Product>(`/products/${id}`),
+  getById: (id: string) => apiCall(`/products/${id}`),
 
-  /** Create a product and optionally upload its image files in the same request. */
-  create: (data: CreateProductData, files: File[] = []): Promise<Product> => {
-    if (files.length === 0) {
-      return apiCall<Product>("/products", {
-        method: "POST",
-        body: data,
-      });
-    }
-
-    const formData = new FormData();
-
-    Object.entries(data).forEach(([key, value]) => {
-      if (value === undefined || value === null) return;
-      formData.append(
-        key,
-        Array.isArray(value) ? JSON.stringify(value) : String(value),
-      );
-    });
-
-    files.forEach((file) => formData.append("images", file));
-
-    return apiCall<Product>("/products", {
+  create: (data: any) =>
+    apiCall("/products", {
       method: "POST",
-      body: formData,
-    });
-  },
-
-  /**
-   * Update product information.
-   */
-  update: (id: string, data: UpdateProductData): Promise<Product> =>
-    apiCall<Product>(`/products/${id}`, {
-      method: "PATCH",
-      body: data,
+      body: JSON.stringify(data),
     }),
 
-  /**
-   * Upload product images.
-   *
-   * IMPORTANT:
-   * Backend Multer expects:
-   *
-   * FormData field = "images"
-   */
-  uploadImages: (productId: string, files: File[]): Promise<unknown> => {
-    const formData = new FormData();
+  update: (id: string, data: any) =>
+    apiCall(`/products/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
 
-    files.forEach((file) => {
-      formData.append("images", file);
-    });
-
-    return apiCall<unknown>(`/products/${productId}/upload-images`, {
-      method: "POST",
-      body: formData,
-    });
-  },
-
-  /**
-   * Increment rental count.
-   */
-  incrementRental: (id: string): Promise<Product> =>
-    apiCall<Product>(`/products/${id}/increment-rental`, {
+  incrementRental: (id: string) =>
+    apiCall(`/products/${id}/increment-rental`, {
       method: "PATCH",
     }),
 
-  /**
-   * Delete product.
-   */
-  delete: (id: string): Promise<{ message?: string }> =>
-    apiCall<{ message?: string }>(`/products/${id}`, {
+  delete: (id: string) =>
+    apiCall(`/products/${id}`, {
       method: "DELETE",
     }),
 
-  /**
-   * Get products belonging to a user/partner.
-   */
-  getByOwner: (ownerId: number): Promise<Product[]> =>
-    apiCall<Product[]>(`/products/owner/${ownerId}`),
+  getByOwner: (ownerId: number) => apiCall(`/products/owner/${ownerId}`),
 };
 
 // ============================================================
-// Order APIs
+// ORDER APIs
 // ============================================================
 
 export const orderAPI = {
@@ -547,22 +340,26 @@ export const orderAPI = {
 
   getByUserId: (userId: number) => apiCall(`/orders/user/${userId}`),
 
-  create: (data: Record<string, unknown>) =>
+  create: (data: any) =>
     apiCall("/orders", {
       method: "POST",
-      body: data,
+      body: JSON.stringify(data),
     }),
 
   updateStatus: (id: string, status: string) =>
     apiCall(`/orders/${id}/status`, {
       method: "PATCH",
-      body: { status },
+      body: JSON.stringify({
+        status,
+      }),
     }),
 
   updateItemStatus: (orderId: string, itemId: string, status: string) =>
     apiCall(`/orders/${orderId}/item/${itemId}/status`, {
       method: "PATCH",
-      body: { status },
+      body: JSON.stringify({
+        status,
+      }),
     }),
 
   delete: (id: string) =>
@@ -572,26 +369,22 @@ export const orderAPI = {
 };
 
 // ============================================================
-// Cart APIs
+// CART APIs
 // ============================================================
 
 export const cartAPI = {
   getCart: (userId: number) => apiCall(`/cart/${userId}`),
 
-  addItem: (userId: number, data: Record<string, unknown>) =>
+  addItem: (userId: number, data: any) =>
     apiCall(`/cart/${userId}/add`, {
       method: "POST",
-      body: data,
+      body: JSON.stringify(data),
     }),
 
-  updateItem: (
-    userId: number,
-    cartItemId: string,
-    data: Record<string, unknown>,
-  ) =>
+  updateItem: (userId: number, cartItemId: string, data: any) =>
     apiCall(`/cart/${userId}/item/${cartItemId}`, {
       method: "PATCH",
-      body: data,
+      body: JSON.stringify(data),
     }),
 
   removeItem: (userId: number, productId: string) =>
@@ -606,7 +399,7 @@ export const cartAPI = {
 };
 
 // ============================================================
-// Wishlist APIs
+// WISHLIST APIs
 // ============================================================
 
 export const wishlistAPI = {
@@ -615,7 +408,9 @@ export const wishlistAPI = {
   addItem: (userId: number, productId: string) =>
     apiCall(`/wishlist/${userId}/add`, {
       method: "POST",
-      body: { productId },
+      body: JSON.stringify({
+        productId,
+      }),
     }),
 
   removeItem: (userId: number, productId: string) =>
@@ -628,23 +423,23 @@ export const wishlistAPI = {
 };
 
 // ============================================================
-// Review APIs
+// REVIEW APIs
 // ============================================================
 
 export const reviewAPI = {
   getProductReviews: (productId: string) =>
     apiCall(`/reviews/product/${productId}`),
 
-  create: (data: Record<string, unknown>) =>
+  create: (data: any) =>
     apiCall("/reviews", {
       method: "POST",
-      body: data,
+      body: JSON.stringify(data),
     }),
 
-  update: (id: string, data: Record<string, unknown>) =>
+  update: (id: string, data: any) =>
     apiCall(`/reviews/${id}`, {
       method: "PATCH",
-      body: data,
+      body: JSON.stringify(data),
     }),
 
   delete: (id: string) =>
@@ -654,7 +449,7 @@ export const reviewAPI = {
 };
 
 // ============================================================
-// Transaction APIs
+// TRANSACTION APIs
 // ============================================================
 
 export const transactionAPI = {
@@ -662,22 +457,24 @@ export const transactionAPI = {
 
   getByUserId: (userId: number) => apiCall(`/transactions/user/${userId}`),
 
-  create: (data: Record<string, unknown>) =>
+  create: (data: any) =>
     apiCall("/transactions", {
       method: "POST",
-      body: data,
+      body: JSON.stringify(data),
     }),
 
   updateStatus: (id: string, status: string) =>
     apiCall(`/transactions/${id}/status`, {
       method: "PATCH",
-      body: { status },
+      body: JSON.stringify({
+        status,
+      }),
     }),
 
-  requestWithdrawal: (data: Record<string, unknown>) =>
+  requestWithdrawal: (data: any) =>
     apiCall("/transactions/withdrawal/request", {
       method: "POST",
-      body: data,
+      body: JSON.stringify(data),
     }),
 
   processWithdrawal: (id: string) =>
@@ -685,76 +482,52 @@ export const transactionAPI = {
       method: "POST",
     }),
 
-  transfer: (data: Record<string, unknown>) =>
+  transfer: (data: any) =>
     apiCall("/transactions/transfer", {
       method: "POST",
-      body: data,
+      body: JSON.stringify(data),
     }),
 };
 
 // ============================================================
-// Admin APIs
+// ADMIN APIs
 // ============================================================
 
 export const adminAPI = {
-  getDashboard: () => apiCall<AdminDashboardMetrics>("/admin/dashboard"),
+  getOverview: () => apiCall("/admin/overview"),
 
-  getOverview: () => apiCall<AdminDashboardMetrics>("/admin/overview"),
+  getUsers: () => apiCall("/admin/users"),
 
-  getUsers: (page = 1, limit = 20) =>
-    apiCall<PaginatedResponse<AuthUserResponse>>(
-      `/admin/users?page=${page}&limit=${Math.min(limit, 100)}`,
-    ),
-
-  getUser: (id: number | string) =>
-    apiCall<AuthUserResponse>(`/admin/users/${id}`),
-
-  updateUser: (id: number | string, data: AdminUserUpdate) =>
-    apiCall<AuthUserResponse>(`/admin/users/${id}`, {
+  updateUser: (id: number | string, data: any) =>
+    apiCall(`/admin/users/${id}`, {
       method: "PATCH",
-      body: data,
-    }),
-
-  getPartners: (page = 1, limit = 20) =>
-    apiCall<PaginatedResponse<AuthUserResponse>>(
-      `/admin/partners?page=${page}&limit=${Math.min(limit, 100)}`,
-    ),
-
-  verifyPartner: (id: number | string, data: PartnerVerificationUpdate = {}) =>
-    apiCall<AuthUserResponse>(`/admin/partners/${id}/verify`, {
-      method: "PATCH",
-      body: data,
+      body: JSON.stringify(data),
     }),
 
   getProducts: () => apiCall("/admin/products"),
 
-  updateProduct: (id: number | string, data: Record<string, unknown>) =>
+  updateProduct: (id: number | string, data: any) =>
     apiCall(`/admin/products/${id}`, {
       method: "PATCH",
-      body: data,
+      body: JSON.stringify(data),
     }),
 
   getOrders: () => apiCall("/admin/orders"),
 
-  updateOrderStatus: (id: string, data: Record<string, unknown>) =>
+  updateOrderStatus: (id: string, data: any) =>
     apiCall(`/admin/orders/${id}/status`, {
       method: "PATCH",
-      body: data,
+      body: JSON.stringify(data),
     }),
 
   deleteOrder: (id: string) =>
     apiCall(`/admin/orders/${id}`, {
       method: "DELETE",
     }),
-
-  getWaitlist: (page = 1, limit = 20) =>
-    apiCall<PaginatedResponse<Record<string, unknown>>>(
-      `/admin/waitlist?page=${page}&limit=${Math.min(limit, 100)}`,
-    ),
 };
 
 // ============================================================
-// Waitlist APIs
+// WAITLIST APIs
 // ============================================================
 
 export const waitlistAPI = {
@@ -766,7 +539,11 @@ export const waitlistAPI = {
   }) =>
     apiCall("/waitlist", {
       method: "POST",
-      body: data,
+      body: JSON.stringify({
+        ...data,
+        name: data.name.trim(),
+        email: data.email.trim().toLowerCase(),
+      }),
     }),
 
   getAll: () => apiCall("/waitlist"),
