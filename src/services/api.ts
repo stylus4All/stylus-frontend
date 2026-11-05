@@ -493,10 +493,64 @@ export const transactionAPI = {
 // ADMIN APIs
 // ============================================================
 
+export interface AuthUserResponse {
+  id: number;
+  email: string;
+  name: string;
+  phone?: string | null;
+  role: "User" | "Partner" | "Admin";
+  status?: "Active" | "Suspended";
+  verificationStatus: "Verified" | "Unverified" | "Pending" | "Rejected";
+  verificationDocs?: unknown;
+  walletBalance?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AdminDashboardMetrics {
+  users: number;
+  partners: number;
+  products: number;
+  orders: number;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 export const adminAPI = {
   getOverview: () => apiCall("/admin/overview"),
 
-  getUsers: () => apiCall("/admin/users"),
+  getUsers: (page = 1, limit = 20) =>
+    apiCall(`/admin/users?page=${page}&limit=${limit}`) as Promise<
+      PaginatedResponse<AuthUserResponse>
+    >,
+
+  getUser: (id: number | string) =>
+    apiCall(`/admin/users/${id}`) as Promise<AuthUserResponse>,
+
+  getPartners: (page = 1, limit = 20) =>
+    apiCall(`/admin/partners?page=${page}&limit=${limit}`) as Promise<
+      PaginatedResponse<AuthUserResponse>
+    >,
+
+  verifyPartner: (
+    id: number | string,
+    data: {
+      verificationStatus?: "Pending" | "Verified" | "Rejected";
+      adminNotes?: string;
+    },
+  ) =>
+    apiCall(`/admin/partners/${id}/verify`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }) as Promise<AuthUserResponse>,
 
   updateUser: (id: number | string, data: any) =>
     apiCall(`/admin/users/${id}`, {

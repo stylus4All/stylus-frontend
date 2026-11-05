@@ -86,7 +86,7 @@ export const AdminDashboard: React.FC = () => {
         const loadAdminData = async () => {
             try {
                 const [metricsResponse, usersResponse, productsResponse, ordersResponse] = await Promise.all([
-                    adminAPI.getDashboard(),
+                    adminAPI.getOverview(),
                     adminAPI.getUsers(1, 100),
                     adminAPI.getProducts(),
                     adminAPI.getOrders(),
@@ -289,7 +289,7 @@ export const AdminDashboard: React.FC = () => {
 
         if (type === 'users') {
             headers = ["ID", "Name", "Email", "Role", "Status", "Joined", "Verification", "Wallet"];
-            rows = adminUsers.map(u => [u.id, u.name, u.email, u.role, u.status, u.joined, u.verificationStatus, u.walletBalance]);
+            rows = adminUsers.map(u => [u.id, u.name, u.email, u.role, u.status, u.createdAt, u.verificationStatus, u.walletBalance]);
         } else if (type === 'products') {
             headers = ["ID", "Name", "Brand", "Category", "Rental Price", "Buy Price", "Owner", "Rentals"];
             rows = products.map(p => [p.id, p.name, p.brand, p.category, p.rentalPrice, p.buyPrice, p.ownerId, p.rentalCount]);
